@@ -1,0 +1,96 @@
+// server.js — بدون نیاز به هیچ پکیج. روی نورثفلنگ با Node اجرا میشه.
+const http = require("http");
+const os = require("os");
+const PORT = process.env.PORT || 8080;
+const started = Date.now();
+let hits = 0;
+
+const html = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پنل مدیریت</title>
+<style>
+:root{--bg:#0b1020;--card:rgba(255,255,255,.06);--line:rgba(255,255,255,.1);--tx:#e8ecf8;--mut:#8b94b3;--a:#7c5cff;--b:#22d3ee;--ok:#34d399}
+*{box-sizing:border-box;margin:0}
+body{font-family:Tahoma,"Segoe UI",system-ui,sans-serif;background:radial-gradient(900px 500px at 85% -10%,#2b1f6b55,transparent),radial-gradient(700px 400px at 0% 100%,#0e7490440,transparent),var(--bg);color:var(--tx);min-height:100vh;padding:20px}
+.wrap{max-width:900px;margin:auto}
+header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 24px}
+h1{font-size:22px;background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);padding:6px 14px;border-radius:99px;font-size:13px;color:var(--ok)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:p 1.6s infinite}
+@keyframes p{50%{opacity:.35}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;backdrop-filter:blur(12px);transition:.25s}
+.card:hover{transform:translateY(-3px);border-color:#7c5cff88}
+.card small{color:var(--mut);font-size:12px}
+.card b{display:block;font-size:26px;margin-top:8px}
+.bar{height:6px;background:#ffffff14;border-radius:9px;margin-top:12px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));transition:width .6s}
+h2{font-size:15px;margin:28px 0 12px;color:var(--mut);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:12px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:500;font-size:12px}
+.tag{padding:3px 10px;border-radius:99px;font-size:12px;background:#34d39922;color:var(--ok)}
+.tag.off{background:#f8717122;color:#f87171}
+button{width:100%;margin-top:18px;padding:14px;border:0;border-radius:14px;font:inherit;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--a),var(--b));cursor:pointer}
+button:active{transform:scale(.98)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>✨ پنل مدیریت</h1><div class="pill"><span class="dot"></span>آنلاین</div></header>
+
+  <div class="grid">
+    <div class="card"><small>آپتایم</small><b id="up">—</b></div>
+    <div class="card"><small>تعداد درخواست</small><b id="hits">—</b></div>
+    <div class="card"><small>مصرف رم</small><b id="mem">—</b><div class="bar"><i id="memb"></i></div></div>
+    <div class="card"><small>پردازنده</small><b id="cpu">—</b></div>
+  </div>
+
+  <h2>کاربران</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>نام</th><th>وضعیت</th><th>حجم مصرفی</th></tr></thead>
+      <tbody>
+        <tr><td>کاربر ۱</td><td><span class="tag">فعال</span></td><td>۱٫۲ گیگ</td></tr>
+        <tr><td>کاربر ۲</td><td><span class="tag">فعال</span></td><td>۳۴۰ مگ</td></tr>
+        <tr><td>کاربر ۳</td><td><span class="tag off">غیرفعال</span></td><td>۰</td></tr>
+      </tbody>
+    </table>
+    <button onclick="load()">🔄 بروزرسانی</button>
+  </div>
+</div>
+<script>
+const f=s=>{s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+" ساعت "+m+" دقیقه"};
+async function load(){
+  try{
+    const d=await (await fetch("/api/status")).json();
+    up.textContent=f(d.uptime);
+    hits.textContent=d.hits.toLocaleString("fa");
+    mem.textContent=d.memPercent+"٪";
+    memb.style.width=d.memPercent+"%";
+    cpu.textContent=d.cpus+" هسته";
+  }catch(e){}
+}
+load();setInterval(load,5000);
+</script>
+</body>
+</html>`;
+
+http.createServer((req, res) => {
+  hits++;
+  if (req.url === "/api/status") {
+    const total = os.totalmem(), free = os.freemem();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({
+      uptime: (Date.now() - started) / 1000,
+      hits,
+      memPercent: Math.round(((total - free) / total) * 100),
+      cpus: os.cpus().length,
+    }));
+  }
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(html);
+}).listen(PORT, "0.0.0.0", () => console.log("Panel on " + PORT));
